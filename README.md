@@ -1,6 +1,8 @@
 # Protocol 7
 Wispr Flow but local kinda (this iis the first version, it works tho support is ass will work on this tmrw)
 ## IMPORTANT: you have to restart when maing changes in settings (will fix tmrw)
+<img width="134" height="57" alt="image" src="https://github.com/user-attachments/assets/9ac9c6e1-4fd1-4c3e-a183-014eacf854b5" />
+<img width="1913" height="1078" alt="image" src="https://github.com/user-attachments/assets/8be086a8-bcd9-4c1a-88de-8f56f953d7de" />
 
 A standalone Wayland-native Linux desktop application for AI-powered voice dictation.
 
