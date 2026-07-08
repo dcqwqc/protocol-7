@@ -1,5 +1,5 @@
 # Protocol 7
-Wispr Flow but local kinda (this iis the first version, it works tho support is ass will work on this tmrw)
+Wispr Flow but local kinda (this iis the first version, it works tho support is ass will work on this tmrw also you have to restart when making changes will fix this tmrw)
 
 A standalone Wayland-native Linux desktop application for AI-powered voice dictation.
 
