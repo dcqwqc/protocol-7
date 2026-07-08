@@ -1,4 +1,4 @@
-# WWispr Flow but local
+# Wispr Flow but local
 
 A standalone Wayland-native Linux desktop application for AI-powered voice dictation.
 
