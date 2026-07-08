@@ -17,9 +17,15 @@ class AudioRecorder:
         if status:
             print(status)
         if self.is_recording:
-            self.audio_queue.put(indata.copy())
+            # Convert to mono if stereo
+            if self.channels > 1:
+                mono_data = np.mean(indata, axis=1)
+            else:
+                mono_data = indata.flatten()
+                
+            self.audio_queue.put(mono_data.copy())
             # Calculate volume level for visualizer (RMS)
-            rms = np.sqrt(np.mean(indata**2))
+            rms = np.sqrt(np.mean(mono_data**2))
             # Normalize and smooth slightly
             self.volume_level = min(1.0, rms * 10)  # arbitrary scaling for visualization
 
@@ -27,15 +33,34 @@ class AudioRecorder:
         self.is_recording = True
         self.audio_queue = queue.Queue()
         self.volume_level = 0.0
+        self.actual_sample_rate = self.sample_rate
         
         try:
-            self.stream = sd.InputStream(
-                samplerate=self.sample_rate,
-                device=self.device_id,
-                channels=self.channels,
-                callback=self._audio_callback,
-                dtype='float32'
-            )
+            try:
+                self.stream = sd.InputStream(
+                    samplerate=self.sample_rate,
+                    device=self.device_id,
+                    channels=1,
+                    callback=self._audio_callback,
+                    dtype='float32'
+                )
+                self.channels = 1
+            except Exception as e:
+                # If 16000Hz Mono fails, fallback to native hardware defaults
+                device_info = sd.query_devices(self.device_id, 'input')
+                native_sr = int(device_info['default_samplerate'])
+                native_channels = min(2, max(1, int(device_info['max_input_channels'])))
+                
+                self.actual_sample_rate = native_sr
+                self.channels = native_channels
+                
+                self.stream = sd.InputStream(
+                    samplerate=native_sr,
+                    device=self.device_id,
+                    channels=native_channels,
+                    callback=self._audio_callback,
+                    dtype='float32'
+                )
             self.stream.start()
         except Exception as e:
             print(f"Error starting audio recording: {e}")
@@ -54,7 +79,14 @@ class AudioRecorder:
             audio_data.append(self.audio_queue.get())
         
         if audio_data:
-            return np.concatenate(audio_data, axis=0).flatten()
+            audio = np.concatenate(audio_data, axis=0).flatten()
+            # Resample if native hardware rate differs from Whisper's target rate
+            if getattr(self, 'actual_sample_rate', self.sample_rate) != self.sample_rate:
+                duration = len(audio) / self.actual_sample_rate
+                time_old = np.linspace(0, duration, len(audio))
+                time_new = np.linspace(0, duration, int(len(audio) * self.sample_rate / self.actual_sample_rate))
+                audio = np.interp(time_new, time_old, audio).astype('float32')
+            return audio
         return np.array([])
     
     def get_volume_level(self):

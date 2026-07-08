@@ -11,9 +11,10 @@ DEFAULT_CONFIG = {
     "auto_detect_language": True,
     "translate": False,
     "target_language": "en",
-    "accent_color": "#00ffcc",
+    "accent_color": "#B57EDC",  # Lavender purple
     "input_device": None,
-    "hotkey_keycode": 29  # KEY_LEFTCTRL
+    "hotkey_keycode": 29,  # KEY_LEFTCTRL
+    "theme_mode": "system" # system, dark, light
 }
 
 def load_config():

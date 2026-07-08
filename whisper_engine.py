@@ -32,14 +32,22 @@ class WhisperEngine:
         task = "translate" if translate else "transcribe"
         
         kwargs = {
-            "task": task
+            "task": task,
+            "condition_on_previous_text": False,
+            "initial_prompt": "Hello. This is a clean, perfectly punctuated transcript."
         }
         
         if not auto_detect and language:
             kwargs["language"] = language
 
         print("Transcribing...")
-        segments, info = self.model.transcribe(audio_data, beam_size=5, **kwargs)
+        segments, info = self.model.transcribe(
+            audio_data, 
+            beam_size=5, 
+            vad_filter=True,
+            vad_parameters=dict(min_silence_duration_ms=500),
+            **kwargs
+        )
         
         text = "".join(segment.text for segment in segments)
         return text.strip()
