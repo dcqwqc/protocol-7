@@ -110,13 +110,24 @@ Output: The dog barked loudly at the mailman."""
                     res = json.loads(response.read().decode('utf-8'))
                     clean_text = res.get("message", {}).get("content", "").strip()
             else:
+                # Use stream=True to yield tokens one by one. 
+                # This forces llama_cpp_python to constantly release and reacquire the Python GIL,
+                # which gives the GTK main thread time to update the UI loading animation!
                 response = self.llm.create_chat_completion(
                     messages=messages,
                     max_tokens=2048,
                     temperature=0.0,
-                    stop=["\n", "Text:", "User:"]
+                    stop=["\n", "Text:", "User:"],
+                    stream=True
                 )
-                clean_text = response["choices"][0]["message"]["content"].strip()
+                
+                chunks = []
+                for chunk in response:
+                    delta = chunk["choices"][0].get("delta", {})
+                    if "content" in delta:
+                        chunks.append(delta["content"])
+                
+                clean_text = "".join(chunks).strip()
                 
             # If the LLM completely failed or output empty string, fallback to original
             if not clean_text:

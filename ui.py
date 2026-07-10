@@ -112,6 +112,7 @@ class DictationOverlay(Gtk.Window):
         # Initialize Layer Shell
         Gtk4LayerShell.init_for_window(self)
         Gtk4LayerShell.set_layer(self, Gtk4LayerShell.Layer.OVERLAY)
+        Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.NONE)
         
         # Anchor to bottom center
         Gtk4LayerShell.set_anchor(self, Gtk4LayerShell.Edge.BOTTOM, True)

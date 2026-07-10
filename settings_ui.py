@@ -572,8 +572,10 @@ Output: The dog barked loudly at the mailman."""
         
         # Automatically restart the application to apply tray icon and hotkey changes
         import subprocess
+        import os
+        APP_DIR = os.path.dirname(os.path.abspath(__file__))
         restart_cmd = "sleep 0.5; pkill -f 'python.*main.py'; pkill -f 'python.*tray.py'; sleep 0.5; nohup ./venv/bin/python main.py > /dev/null 2>&1 &"
-        subprocess.Popen(restart_cmd, shell=True, cwd="/home/qwqc/projects/whisper-flow", start_new_session=True)
+        subprocess.Popen(restart_cmd, shell=True, cwd=APP_DIR, start_new_session=True)
         
         self.close()
 
@@ -581,8 +583,8 @@ Output: The dog barked loudly at the mailman."""
         import os
         import shutil
         autostart_dir = os.path.expanduser("~/.config/autostart")
-        desktop_file = os.path.expanduser("~/.local/share/applications/whisper-flow.desktop")
-        autostart_target = os.path.join(autostart_dir, "whisper-flow.desktop")
+        desktop_file = os.path.expanduser("~/.local/share/applications/protocol-7.desktop")
+        autostart_target = os.path.join(autostart_dir, "protocol-7.desktop")
         
         if self.config.get("autostart", False):
             os.makedirs(autostart_dir, exist_ok=True)

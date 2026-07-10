@@ -7,7 +7,7 @@ import sounddevice as sd
 from PIL import Image, ImageDraw
 from config import load_config, save_config
 
-APP_DIR = "/home/qwqc/projects/whisper-flow"
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
 MAIN_PY = os.path.join(APP_DIR, "main.py")
 
 def create_image():

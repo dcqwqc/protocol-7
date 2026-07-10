@@ -21,7 +21,7 @@ class TrayIcon:
         import subprocess
         import sys
         import os
-        APP_DIR = "/home/qwqc/projects/whisper-flow"
+        APP_DIR = os.path.dirname(os.path.abspath(__file__))
         tray_path = os.path.join(APP_DIR, "tray.py")
         self.tray_log = open(os.path.join(APP_DIR, "tray_crash.log"), "w")
         self.process = subprocess.Popen([sys.executable, tray_path, str(os.getpid())], cwd=APP_DIR, stdout=self.tray_log, stderr=subprocess.STDOUT)
