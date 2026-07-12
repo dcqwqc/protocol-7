@@ -9,14 +9,17 @@ class WhisperEngine:
 
     def _load_model(self):
         model_size = self.config.get("model_size", "tiny.en")
-        compute_type = self.config.get("compute_type", "default")
+        
+        # If running on CPU, int8 is significantly faster and uses less memory
+        compute_type = self.config.get("compute_type", "int8")
         
         if self.model is None or self.current_model_size != model_size:
-            print(f"Loading Whisper model: {model_size}...")
-            # We use CPU by default, or let faster_whisper auto-detect CUDA/ROCm
+            print(f"Loading Whisper model: {model_size} (compute_type: {compute_type})...")
+            import time
+            start_load = time.time()
             self.model = WhisperModel(model_size, device="auto", compute_type=compute_type)
             self.current_model_size = model_size
-            print("Model loaded successfully.")
+            print(f"Model loaded successfully in {time.time() - start_load:.2f}s.")
 
     def transcribe(self, audio_data):
         if len(audio_data) == 0:
@@ -40,14 +43,19 @@ class WhisperEngine:
         if not auto_detect and language:
             kwargs["language"] = language
 
-        print("Transcribing...")
+        print("Transcribing with Whisper (beam_size=1)...")
+        import time
+        t0 = time.time()
+        
+        # Use beam_size=1 (greedy) for massive speedup. Beam size 5 is overkill for dictation and slow on CPU.
         segments, info = self.model.transcribe(
             audio_data, 
-            beam_size=5, 
+            beam_size=1, 
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=500),
             **kwargs
         )
         
         text = "".join(segment.text for segment in segments)
+        print(f"[Whisper] Internal Transcription took {time.time() - t0:.2f}s")
         return text.strip()

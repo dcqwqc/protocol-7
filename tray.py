@@ -69,6 +69,33 @@ def make_device_callback(device_id):
         set_device(device_id, icon)
     return callback
 
+def get_history_items():
+    from config import load_history
+    import subprocess
+    history = load_history()
+    
+    def copy_to_clipboard(text):
+        try:
+            subprocess.run(['wl-copy'], input=text.encode('utf-8'))
+        except Exception:
+            pass
+
+    def make_history_callback(text):
+        return lambda icon, item: copy_to_clipboard(text)
+        
+    items = []
+    for entry in history[:10]:
+        text = entry.get("text", "")
+        if not text:
+            continue
+        display_text = text if len(text) < 40 else text[:37] + "..."
+        items.append(pystray.MenuItem(display_text, make_history_callback(text)))
+        
+    if not items:
+        items.append(pystray.MenuItem("No history yet", lambda icon, item: None, enabled=False))
+        
+    return items
+
 def build_menu():
     devices = []
     try:
@@ -98,6 +125,7 @@ def build_menu():
         ))
         
     return pystray.Menu(
+        pystray.MenuItem('History', pystray.Menu(get_history_items)),
         pystray.MenuItem('Microphone', pystray.Menu(*mic_items)),
         pystray.MenuItem('Settings', on_settings),
         pystray.MenuItem('Restart', restart_app),

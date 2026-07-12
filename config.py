@@ -36,3 +36,37 @@ def save_config(config):
     os.makedirs(CONFIG_DIR, exist_ok=True)
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=4)
+
+HISTORY_FILE = os.path.join(CONFIG_DIR, "history.json")
+
+def load_history():
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    try:
+        with open(HISTORY_FILE, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading history: {e}")
+        return []
+
+def add_history(text):
+    if not text or not text.strip():
+        return
+    history = load_history()
+    # Add to beginning of list
+    import time
+    entry = {
+        "timestamp": time.time(),
+        "text": text.strip()
+    }
+    history.insert(0, entry)
+    
+    # Keep up to 100 entries max to prevent file from growing indefinitely
+    history = history[:100]
+    
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    try:
+        with open(HISTORY_FILE, "w") as f:
+            json.dump(history, f, indent=4)
+    except Exception as e:
+        print(f"Error saving history: {e}")

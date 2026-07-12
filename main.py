@@ -65,24 +65,59 @@ class WhisperFlowApp:
             threading.Thread(target=self.process_audio, daemon=True).start()
 
     def process_audio(self):
-        audio_data = self.audio_recorder.stop_recording()
+        import time
+        import traceback
+        start_time = time.time()
         
-        if len(audio_data) > 0:
-            text = self.whisper_engine.transcribe(audio_data)
-            if text:
-                print(f"Transcribed: {text}")
-                clean_text = self.llm_rewriter.rewrite(text)
-                if clean_text != text:
-                    print(f"Rewritten to: {clean_text}")
-                if clean_text.strip():
-                    self.paste_text(clean_text)
-            else:
-                print("No text transcribed.")
-        else:
-            print("No audio data recorded.")
+        try:
+            audio_data = self.audio_recorder.stop_recording()
+            audio_time = time.time()
+            print(f"[Timer] Audio collected and resampled in {audio_time - start_time:.2f}s (Array length: {len(audio_data)})")
             
-        # Hide UI
-        GLib.idle_add(self.ui_manager.hide)
+            if len(audio_data) > 0:
+                transcribe_start = time.time()
+                text = self.whisper_engine.transcribe(audio_data)
+                transcribe_end = time.time()
+                print(f"[Timer] Whisper Transcription took {transcribe_end - transcribe_start:.2f}s")
+                
+                if text:
+                    print(f"Transcribed: {text}")
+                    
+                    llm_start = time.time()
+                    clean_text = self.llm_rewriter.rewrite(text)
+                    llm_end = time.time()
+                    print(f"[Timer] LLM Rewriting took {llm_end - llm_start:.2f}s")
+                    
+                    if clean_text != text:
+                        print(f"Rewritten to: {clean_text}")
+                    
+                    # Hide UI before pasting so Wayland compositor restores focus to terminal
+                    GLib.idle_add(self.ui_manager.hide)
+                    time.sleep(0.4) # Wait 400ms to ensure the user has physically released the Ctrl key
+                    
+                    if clean_text.strip():
+                        from config import add_history
+                        add_history(clean_text)
+                        
+                        paste_start = time.time()
+                        self.paste_text(clean_text)
+                        print(f"[Timer] Paste operation took {time.time() - paste_start:.2f}s")
+                    
+                    print(f"[Timer] Total Pipeline Execution Time: {time.time() - start_time:.2f}s")
+                    return
+                else:
+                    print("No text transcribed.")
+            else:
+                print("No audio data recorded.")
+                
+            print(f"[Timer] Pipeline Failed/Empty, Total Time: {time.time() - start_time:.2f}s")
+            
+        except Exception as e:
+            print(f"[ERROR] Fatal error in audio processing pipeline: {e}")
+            traceback.print_exc()
+        finally:
+            # ALWAYS hide the UI, no matter what happens, to prevent infinite loading animation!
+            GLib.idle_add(self.ui_manager.hide)
 
     def paste_text(self, text):
         try:

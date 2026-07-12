@@ -31,7 +31,7 @@ class LLMRewriter:
             from llama_cpp import Llama
             self.llm = Llama(
                 model_path=model_path,
-                n_ctx=512,  # keep context tiny for speed
+                n_ctx=4096,  # increased from 512 to 4096 to prevent truncation on long speeches
                 n_threads=4,
                 verbose=False
             )
@@ -117,7 +117,7 @@ Output: The dog barked loudly at the mailman."""
                     messages=messages,
                     max_tokens=2048,
                     temperature=0.0,
-                    stop=["\n", "Text:", "User:"],
+                    stop=["Text:", "User:"],
                     stream=True
                 )
                 

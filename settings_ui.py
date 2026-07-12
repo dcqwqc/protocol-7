@@ -396,6 +396,48 @@ Output: The dog barked loudly at the mailman."""
         
         vbox.append(integration_box)
 
+        # -- History --
+        self.add_section_title(vbox, "History")
+        history_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        view_history_btn = Gtk.Button(label="View Dictation History")
+        
+        def on_view_history_clicked(btn):
+            hist_window = Gtk.Window(title="Dictation History")
+            hist_window.set_default_size(600, 500)
+            hist_window.set_transient_for(self)
+            
+            scrolled = Gtk.ScrolledWindow()
+            textview = Gtk.TextView()
+            textview.set_editable(False)
+            textview.set_wrap_mode(Gtk.WrapMode.WORD)
+            
+            try:
+                from config import load_history
+                history = load_history()
+                if not history:
+                    content = "No history found."
+                else:
+                    import datetime
+                    lines = []
+                    for entry in history:
+                        text = entry.get("text", "")
+                        ts = entry.get("timestamp", 0)
+                        dt = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+                        lines.append(f"[{dt}]\n{text}\n")
+                    content = "\n".join(lines)
+            except Exception as e:
+                content = f"Error loading history: {e}"
+                
+            textview.get_buffer().set_text(content)
+            scrolled.set_child(textview)
+            hist_window.set_child(scrolled)
+            hist_window.present()
+            
+        view_history_btn.connect("clicked", on_view_history_clicked)
+        history_box.append(Gtk.Label(label="View all past transcriptions:"))
+        history_box.append(view_history_btn)
+        vbox.append(history_box)
+
         # -- Developer & Debugging --
         self.add_section_title(vbox, "Developer & Debugging")
         
@@ -574,8 +616,20 @@ Output: The dog barked loudly at the mailman."""
         import subprocess
         import os
         APP_DIR = os.path.dirname(os.path.abspath(__file__))
-        restart_cmd = "sleep 0.5; pkill -f 'python.*main.py'; pkill -f 'python.*tray.py'; sleep 0.5; nohup ./venv/bin/python main.py > /dev/null 2>&1 &"
-        subprocess.Popen(restart_cmd, shell=True, cwd=APP_DIR, start_new_session=True)
+        
+        # Write a robust, detached restart script
+        script_path = "/tmp/protocol7_restart.sh"
+        with open(script_path, "w") as f:
+            f.write(f"#!/bin/bash\n")
+            f.write(f"sleep 1\n")
+            f.write(f"pkill -f '[p]ython.*main.py'\n")
+            f.write(f"pkill -f '[p]ython.*tray.py'\n")
+            f.write(f"sleep 1\n")
+            f.write(f"cd '{APP_DIR}'\n")
+            f.write(f"nohup {APP_DIR}/venv/bin/python -u main.py > /tmp/protocol7_debug.log 2>&1 &\n")
+        
+        os.chmod(script_path, 0o755)
+        subprocess.Popen([script_path], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         self.close()
 
