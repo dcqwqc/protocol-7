@@ -16,13 +16,16 @@ class HotkeyListener:
         self.pressed_keys = set()
         
     def find_keyboards(self):
-        devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
         keyboards = []
-        for dev in devices:
-            capabilities = dev.capabilities()
-            if evdev.ecodes.EV_KEY in capabilities:
-                if evdev.ecodes.KEY_A in capabilities[evdev.ecodes.EV_KEY]:
-                    keyboards.append(dev)
+        for path in evdev.list_devices():
+            try:
+                dev = evdev.InputDevice(path)
+                capabilities = dev.capabilities()
+                if evdev.ecodes.EV_KEY in capabilities:
+                    if evdev.ecodes.KEY_A in capabilities[evdev.ecodes.EV_KEY]:
+                        keyboards.append(dev)
+            except Exception:
+                continue
         return keyboards
 
     def _listen_device(self, device):
@@ -68,17 +71,28 @@ class HotkeyListener:
         except OSError:
             pass  # Device disconnected
 
+    def _watchdog(self):
+        active_threads = {}
+        while self.running:
+            try:
+                keyboards = self.find_keyboards()
+                current_paths = {kb.path: kb for kb in keyboards}
+                
+                # Start threads for new keyboards
+                for path, kb in current_paths.items():
+                    if path not in active_threads or not active_threads[path].is_alive():
+                        t = threading.Thread(target=self._listen_device, args=(kb,), daemon=True)
+                        t.start()
+                        active_threads[path] = t
+            except Exception as e:
+                pass # Prevent any OS/udev race conditions from killing the watchdog
+                
+            time.sleep(2.0)  # Check every 2 seconds for new/reconnected devices
+
     def start(self):
         self.running = True
-        keyboards = self.find_keyboards()
-        if not keyboards:
-            print("Warning: No keyboards found or insufficient permissions to read /dev/input/event*.")
-            print("Please ensure your user is in the 'input' group: sudo usermod -aG input $USER")
-            return
-            
-        for kb in keyboards:
-            t = threading.Thread(target=self._listen_device, args=(kb,), daemon=True)
-            t.start()
+        t = threading.Thread(target=self._watchdog, daemon=True)
+        t.start()
 
     def stop(self):
         self.running = False
