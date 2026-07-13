@@ -48,11 +48,15 @@ class WhisperEngine:
         t0 = time.time()
         
         # Use beam_size=1 (greedy) for massive speedup. Beam size 5 is overkill for dictation and slow on CPU.
+        # We also disable VAD or make it very lenient so it doesn't aggressively cut off quiet speech or natural pauses.
         segments, info = self.model.transcribe(
             audio_data, 
             beam_size=1, 
             vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=500),
+            vad_parameters=dict(
+                min_silence_duration_ms=2000,  # Increased from 500ms to 2s to allow natural breathing pauses
+                speech_pad_ms=400              # Pad speech segments so ends of words aren't cut off
+            ),
             **kwargs
         )
         
