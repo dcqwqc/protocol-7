@@ -46,23 +46,27 @@ class AudioRecorder:
                 )
                 self.channels = 1
             except Exception as e:
-                # If 16000Hz Mono fails, fallback to native hardware defaults
-                device_info = sd.query_devices(self.device_id, 'input')
-                native_sr = int(device_info['default_samplerate'])
-                native_channels = min(2, max(1, int(device_info['max_input_channels'])))
+                import os
+                try:
+                    with open(os.path.join(os.environ.get("TEMP", "/tmp"), "protocol7_debug.log"), "a") as f:
+                        f.write(f"[AUDIO] Initial 16k Mono stream failed: {e}\n")
+                except: pass
                 
-                self.actual_sample_rate = native_sr
-                self.channels = native_channels
-                
+                # Ultimate fallback: Let PortAudio/Windows auto-negotiate the exact required hardware format
                 self.stream = sd.InputStream(
-                    samplerate=native_sr,
                     device=self.device_id,
-                    channels=native_channels,
                     callback=self._audio_callback,
                     dtype='float32'
                 )
+                self.actual_sample_rate = int(self.stream.samplerate)
+                self.channels = self.stream.channels
             self.stream.start()
         except Exception as e:
+            import os
+            try:
+                with open(os.path.join(os.environ.get("TEMP", "/tmp"), "protocol7_debug.log"), "a") as f:
+                    f.write(f"[AUDIO] Error starting audio recording completely: {e}\n")
+            except: pass
             print(f"Error starting audio recording: {e}")
             self.is_recording = False
 

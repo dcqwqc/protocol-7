@@ -2,7 +2,7 @@
 set -e
 
 echo "======================================"
-echo "    Whisper Flow Installer            "
+echo "    Protocol-7 Installer            "
 echo "======================================"
 
 # Detect OS

@@ -1,5 +1,11 @@
 faster-whisper
 sounddevice
 numpy
-evdev
-PyGObject
+requests
+pystray
+evdev; sys_platform == 'linux'
+PyGObject; sys_platform == 'linux'
+keyboard; sys_platform == 'win32'
+pyperclip; sys_platform == 'win32' or sys_platform == 'linux'
+customtkinter; sys_platform == 'win32'
+pillow; sys_platform == 'win32'

@@ -26,8 +26,8 @@ We provide a universal install script for Debian/Ubuntu, Arch, and Fedora based 
 
 1. Clone the repository and run the install script:
    ```bash
-   git clone https://github.com/dcqwqc/whisper-flow.git
-   cd whisper-flow
+   git clone https://github.com/dcqwqc/protocol-7.git
+   cd protocol-7
    ./install.sh
    ```
 

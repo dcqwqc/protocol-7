@@ -53,7 +53,7 @@ MODELS = _load_downloaded_whisper_models()
 
 class SettingsWindow(Gtk.ApplicationWindow):
     def __init__(self, app, config):
-        super().__init__(application=app, title="Whisper Flow Settings")
+        super().__init__(application=app, title="Protocol-7 Settings")
         self.config = config
         self.set_default_size(550, 750)
         
@@ -445,7 +445,7 @@ Output: The dog barked loudly at the mailman."""
         view_logs_btn = Gtk.Button(label="Open Log Window")
         
         def on_view_logs_clicked(btn):
-            log_window = Gtk.Window(title="Whisper Flow Logs")
+            log_window = Gtk.Window(title="Protocol-7 Logs")
             log_window.set_default_size(600, 400)
             log_window.set_transient_for(self)
             

@@ -1,7 +1,7 @@
 import os
 import json
 
-CONFIG_DIR = os.path.expanduser("~/.config/whisper-flow")
+CONFIG_DIR = os.path.expanduser("~/.config/protocol-7")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 
 DEFAULT_CONFIG = {

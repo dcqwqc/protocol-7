@@ -165,13 +165,15 @@ Output: The dog barked loudly at the mailman."""
                     final_text = "".join([sentence[0] for sentence in data[0]])
 
             # Debug Logging
-            with open("/tmp/whisper_log.txt", "a") as f:
+            log_path = os.path.join(os.environ.get("TEMP", "/tmp"), "whisper_log.txt")
+            with open(log_path, "a") as f:
                 f.write(f"--- TRANSCRIBED ---\nRAW: {text}\nLLM_CLEAN: {clean_text}\nTRANSLATED: {final_text}\n\n")
 
             return final_text
             
         except Exception as e:
             print(f"Processing failed: {e}")
-            with open("/tmp/whisper_log.txt", "a") as f:
+            log_path = os.path.join(os.environ.get("TEMP", "/tmp"), "whisper_log.txt")
+            with open(log_path, "a") as f:
                 f.write(f"ERROR: {e}\n\n")
             return text

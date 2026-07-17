@@ -76,7 +76,8 @@ def get_history_items():
     
     def copy_to_clipboard(text):
         try:
-            subprocess.run(['wl-copy'], input=text.encode('utf-8'))
+            import pyperclip
+            pyperclip.copy(text)
         except Exception:
             pass
 
@@ -99,9 +100,17 @@ def get_history_items():
 def build_menu():
     devices = []
     try:
+        host_apis = sd.query_hostapis()
         for i, dev in enumerate(sd.query_devices()):
             if dev['max_input_channels'] > 0:
-                devices.append((i, dev['name']))
+                api_name = host_apis[dev['hostapi']]['name']
+                if api_name in ("Windows WASAPI", "MME"):
+                    name = dev['name'].replace(", Windows WASAPI", "").replace(", MME", "").strip()
+                    if "Microsoft Sound Mapper" in name:
+                        continue
+                        
+                    api_label = "WASAPI" if api_name == "Windows WASAPI" else "MME"
+                    devices.append((i, f"[{api_label}] {name}"))
     except Exception:
         pass
         
@@ -133,5 +142,5 @@ def build_menu():
     )
 
 if __name__ == "__main__":
-    icon = pystray.Icon("WhisperFlow", create_image(), "Whisper Flow", build_menu())
+    icon = pystray.Icon("Protocol7", create_image(), "Protocol-7", build_menu())
     icon.run()
