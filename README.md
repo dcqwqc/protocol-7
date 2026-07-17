@@ -1,53 +1,65 @@
-# Protocol 7
-Wispr Flow but local kinda
+# Protocol-7
+The ultimate local AI-powered voice dictation tool, built natively for Windows and Linux Wayland.
 
 <img width="134" height="57" alt="image" src="https://github.com/user-attachments/assets/9ac9c6e1-4fd1-4c3e-a183-014eacf854b5" />
 <img width="1913" height="1078" alt="image" src="https://github.com/user-attachments/assets/8be086a8-bcd9-4c1a-88de-8f56f953d7de" />
 
-A standalone Wayland-native Linux desktop application for AI-powered voice dictation.
+Protocol-7 is a standalone desktop application that provides blazing-fast, offline voice dictation. It integrates directly into your operating system to allow seamless, global voice-to-text with advanced AI grammar correction.
 
 ## Features
-- **Wayland Native**: Uses GTK4 layer-shell to overlay a floating window at the bottom of the screen.
-- **Global Hotkey**: Double-tap `Ctrl` to trigger the dictation anywhere in Wayland.
-- **Local AI**: Powered by `faster-whisper` for fast, offline transcription.
-- **AI Grammar Engine**: Features a real-time LLM backend (Built-in LLaMA.cpp or remote Ollama Server) to correct grammar, phonetic typos, and apply self-corrections on the fly.
-- **Auto-Paste**: Instantly pastes the transcribed text into your currently focused window using `wtype`.
-- **Customizable**: Change themes, languages, translation settings, and models visually via the Settings UI.
+- **Cross-Platform Native**: Runs flawlessly on both Windows 10/11 and Linux (Wayland).
+- **Global Hotkey**: Double-tap `Ctrl` to trigger dictation globally from anywhere in your OS. 
+- **Auto-Paste**: Instantly pastes the transcribed text directly into your currently focused window (`pyautogui` on Windows, `wtype` on Wayland).
+- **Local AI Engine**: Powered by `faster-whisper` with automatic hardware acceleration (CUDA fallback to CPU).
+- **AI Grammar & Self-Correction**: Features a real-time LLM backend (Built-in LLaMA.cpp or remote Ollama Server) to correct grammar, fix phonetic typos, and apply vocal self-corrections on the fly.
+- **Advanced Microphone Engine**: Automatically detects WASAPI/MME capabilities, deduplicates virtual inputs, and auto-negotiates sample rates for pristine audio capture.
+- **Customizable UI**: Beautiful dark-mode settings built with `CustomTkinter` (Windows) and `GTK4` (Linux). Change themes, languages, translation targets, and AI prompts visually.
 
-## Requirements
-- `python3`
-- `wtype` (for pasting text in Wayland)
-- GTK4 and GObject Introspection packages
-- `gtk4-layer-shell`
+## Setup for Windows
 
-## Setup
+1. Clone the repository:
+   ```powershell
+   git clone https://github.com/dcqwqc/protocol-7.git
+   cd protocol-7
+   ```
+2. Install requirements:
+   ```powershell
+   pip install -r requirements.txt
+   ```
+3. Run the app:
+   ```powershell
+   python main.py
+   ```
+   *(Optional) You can right-click `create_shortcut.ps1` and select "Run with PowerShell" to generate a hidden `.vbs` shortcut that launches the app silently in the background.*
 
-We provide a universal install script for Debian/Ubuntu, Arch, and Fedora based systems.
+## Setup for Linux (Wayland)
 
-1. Clone the repository and run the install script:
+1. Ensure you have the required dependencies: `python3`, `wtype`, `gtk4`, and `gtk4-layer-shell`.
+2. Clone and run the universal install script (Debian/Ubuntu, Arch, Fedora):
    ```bash
    git clone https://github.com/dcqwqc/protocol-7.git
    cd protocol-7
    ./install.sh
    ```
-
-2. *Note: The install script adds your user to the `input` group to allow global hotkey detection via `evdev`. You may need to log out and log back in, or reboot, for this group change to take effect.*
-
-3. Run the app:
+3. *Note: The install script adds your user to the `input` group to allow global hotkey detection via `evdev`. You may need to log out and log back in.*
+4. Run the app:
    ```bash
    ./venv/bin/python main.py
    ```
-   The app will run in the background. Double-tap `Ctrl` to start dictating. Double-tap `Ctrl` again to stop and paste.
+
+## Usage
+Once running, the app lives silently in your system tray. 
+- **Double-tap `Ctrl`** to start dictating. A beautiful overlay visualizer will pop up at the bottom of your screen.
+- **Double-tap `Ctrl` again** to stop. It will automatically process the audio and type it into your active window.
+
+Right-click the tray icon (or run with `--settings`) to access the configuration menu, view live developer logs, and select your preferred microphone.
 
 ## Configuration & Custom Models
-Right-click the tray icon or run with `--settings` to access the configuration menu.
-
 All model management is handled seamlessly within the Settings UI:
-- **Whisper Models**: Choose from built-in models or input any HuggingFace Repo ID (e.g. `Systran/faster-whisper-large-v3`). The app will dynamically scan your HuggingFace cache to populate dropdowns with models you've already downloaded.
+- **Whisper Models**: Choose from built-in models or input any HuggingFace Repo ID (e.g. `Systran/faster-whisper-large-v3`). 
 - **Local LLM Models**: Select "Built-in (Llama.cpp)" and provide any GGUF filename and HuggingFace Repo.
-- **Ollama**: Connect to a local or remote Ollama server. Click the "Scan" button to automatically pull down all models available on your server.
+- **Ollama**: Connect to a local or remote Ollama server and pull models dynamically.
 - **AI System Prompt**: Fully rewrite and customize the exact prompt instructions the AI follows using the built-in text editor.
-- **Live Logs**: Open the Developer Logs window directly from the settings menu to watch the RAW audio get transcribed and cleaned in real-time.
 
 ## License
 MIT License
