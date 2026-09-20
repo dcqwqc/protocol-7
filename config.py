@@ -12,6 +12,7 @@ DEFAULT_CONFIG = {
     "translate": False,
     "target_language": "en",
     "accent_color": "#B57EDC",  # Lavender purple
+    "use_caelestia_colors": False,
     "input_device": None,
     "hotkey_keycode": 29,  # KEY_LEFTCTRL
     "theme_mode": "system" # system, dark, light

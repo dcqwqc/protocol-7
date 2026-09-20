@@ -375,6 +375,11 @@ Output: The dog barked loudly at the mailman."""
         
         color_box.append(Gtk.Label(label="Accent Color:"))
         color_box.append(self.color_btn)
+        
+        self.caelestia_check = Gtk.CheckButton(label="Dynamically match Caelestia Shell colors")
+        self.caelestia_check.set_active(self.config.get("use_caelestia_colors", False))
+        color_box.append(self.caelestia_check)
+        
         vbox.append(color_box)
 
         # -- Integration --
@@ -579,6 +584,7 @@ Output: The dog barked loudly at the mailman."""
         
         rgba = self.color_btn.get_rgba()
         self.config["accent_color"] = f"#{int(rgba.red*255):02x}{int(rgba.green*255):02x}{int(rgba.blue*255):02x}"
+        self.config["use_caelestia_colors"] = self.caelestia_check.get_active()
         
         dev_idx = self.device_combo.get_selected()
         if dev_idx == 0:
@@ -651,6 +657,9 @@ Output: The dog barked loudly at the mailman."""
     def load_css(self):
         css_provider = Gtk.CssProvider()
         accent = self.config.get("accent_color", "#00ffcc")
+        if self.config.get("use_caelestia_colors", False):
+            caelestia = get_caelestia_colors()
+            accent = caelestia.get("primary", accent)
         
         css = f"""
         .title-label {{
@@ -686,10 +695,33 @@ Output: The dog barked loudly at the mailman."""
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
 
+
+import os
+def get_caelestia_colors():
+    colors = {}
+    try:
+        path = os.path.expanduser("~/.local/state/caelestia/theme/sddm-theme.conf")
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                for line in f:
+                    if line.startswith("surface="):
+                        colors["bg"] = line.strip().split('=')[1]
+                    elif line.startswith("text="):
+                        colors["fg"] = line.strip().split('=')[1]
+                    elif line.startswith("primary="):
+                        colors["primary"] = line.strip().split('=')[1]
+    except: pass
+    return colors
+
 class SettingsApp(Gtk.Application):
     def __init__(self, config):
         super().__init__(application_id="com.whisper.flow.settings")
         self.config = config
+        
+        # Force light theme for settings window
+        settings = Gtk.Settings.get_default()
+        if settings:
+            settings.set_property("gtk-application-prefer-dark-theme", False)
 
     def do_activate(self):
         win = SettingsWindow(self, self.config)

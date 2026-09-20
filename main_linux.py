@@ -47,6 +47,25 @@ class Protocol7App:
         self.ui_manager = UIManager(self.config, self.audio_recorder)
         self.tray = TrayIcon(self)
         
+        # Ensure decoupled wtype daemon is running to prevent OSD layout spam entirely across restarts
+        import os, subprocess
+        import psutil
+        daemon_running = False
+        for p in psutil.process_iter(['cmdline']):
+            try:
+                cmd = p.info['cmdline']
+                if cmd and 'wtype_daemon.py' in ' '.join(cmd):
+                    daemon_running = True
+                    break
+            except: pass
+        if not daemon_running:
+            import sys
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+            daemon_path = os.path.join(app_dir, 'wtype_daemon.py')
+            subprocess.Popen([sys.executable, daemon_path], start_new_session=True)
+            import time
+            time.sleep(0.2)
+            
         self.is_active = False
         
         # KEY_LEFTCTRL is 29
@@ -137,13 +156,10 @@ class Protocol7App:
 
     def paste_text(self, text):
         try:
-            import subprocess
-            # We use wtype to simulate keyboard typing/pasting
-            # -M ctrl -k v etc can also be used if clipboard is populated, 
-            # but wtype text is more direct.
-            subprocess.run(["wtype", text])
+            with open("/tmp/protocol7_wtype.fifo", "w") as f:
+                f.write(text)
         except Exception as e:
-            log_debug(f"Error pasting text with wtype: {e}")
+            log_debug(f"Error writing to wtype daemon fifo: {e}")
 
     def run(self):
         log_debug("Starting Protocol-7...")

@@ -11,13 +11,8 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 MAIN_PY = os.path.join(APP_DIR, "main.py")
 
 def create_image():
-    config = load_config()
-    accent = config.get("accent_color", "#00ffcc").lstrip('#')
-    try:
-        rgb = tuple(int(accent[i:i+2], 16) for i in (0, 2, 4))
-    except Exception:
-        rgb = (0, 255, 204) # fallback
-        
+    # Fully black tray icon as requested
+    rgb = (0, 0, 0)
     image = Image.new('RGBA', (64, 64), color = (0, 0, 0, 0))
     d = ImageDraw.Draw(image)
     d.ellipse((20, 10, 44, 38), fill=rgb)
