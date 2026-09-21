@@ -281,7 +281,6 @@ class OverlaySurface(Gtk.DrawingArea):
             cr.line_to(x, mid_y + bar_h * 0.5)
             cr.stroke()
 
-
 class DictationOverlay(Gtk.Window):
     def __init__(self, app, config, audio_recorder):
         super().__init__(application=app)
@@ -339,6 +338,145 @@ class DictationOverlay(Gtk.Window):
         )
 
 
+class LivePreviewSurface(Gtk.DrawingArea):
+    """A Cairo-rendered preview bubble with a genuinely transparent outside."""
+
+    def __init__(self):
+        super().__init__()
+        self.text = ""
+        self.set_content_width(360)
+        self.set_content_height(48)
+        self.set_draw_func(self.on_draw)
+
+    def set_text(self, text):
+        self.text = text.replace("\n", " ").strip()
+        self.queue_draw()
+
+    def on_draw(self, _area, cr, width, height):
+        # This is essential: GTK's normal label/window painting leaves an
+        # opaque rectangle in the unused corners on some Wayland setups.
+        cr.set_operator(cairo.Operator.CLEAR)
+        cr.paint()
+        cr.set_operator(cairo.Operator.OVER)
+
+        radius = 10
+        cr.new_path()
+        cr.arc(radius, radius, radius, math.pi, 1.5 * math.pi)
+        cr.arc(width - radius, radius, radius, 1.5 * math.pi, 2 * math.pi)
+        cr.arc(width - radius, height - radius, radius, 0, 0.5 * math.pi)
+        cr.arc(radius, height - radius, radius, 0.5 * math.pi, math.pi)
+        cr.close_path()
+        cr.set_source_rgba(0.118, 0.118, 0.133, 0.96)
+        cr.fill()
+
+        text = self.text
+        cr.select_font_face("Sans", cairo.FontSlant.NORMAL, cairo.FontWeight.NORMAL)
+        cr.set_font_size(13)
+        max_width = width - 24
+        while text and cr.text_extents(text + "…").x_advance > max_width:
+            text = text[:-1]
+        if text != self.text:
+            text += "…"
+        ascent, descent, _height, _max_x_advance, _max_y_advance = cr.font_extents()
+        cr.set_source_rgba(0.96, 0.96, 0.96, 1.0)
+        cr.move_to(12, height * 0.5 + (ascent - descent) * 0.5)
+        cr.show_text(text)
+
+
+class LivePreviewPopup(Gtk.Window):
+    """A non-interactive, cursor-adjacent partial-transcript bubble."""
+
+    def __init__(self, app):
+        super().__init__(application=app)
+        Gtk4LayerShell.init_for_window(self)
+        Gtk4LayerShell.set_layer(self, Gtk4LayerShell.Layer.OVERLAY)
+        Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.NONE)
+        Gtk4LayerShell.set_anchor(self, Gtk4LayerShell.Edge.TOP, True)
+        Gtk4LayerShell.set_anchor(self, Gtk4LayerShell.Edge.LEFT, True)
+        Gtk4LayerShell.set_namespace(self, "protocol7-live-preview")
+
+        self.surface = LivePreviewSurface()
+        self.set_child(self.surface)
+        self.set_default_size(360, -1)
+        self.set_decorated(False)
+        self.remove_css_class("background")
+        # Reuse the proven transparent layer-surface style from the waveform
+        # overlay. Without it GTK paints its default window colour into the
+        # transparent parts of the rounded label.
+        self.add_css_class("transparent-window")
+        self.add_css_class("protocol7-live-preview-window")
+        self.set_visible(False)
+        self._follow_stop = None
+        self._follow_thread = None
+        self.connect("realize", self._on_realize)
+
+    def _on_realize(self, _widget):
+        try:
+            surface = self.get_surface()
+            if surface is not None:
+                surface.set_input_region(cairo.Region())
+        except Exception:
+            pass
+
+    def _cursor_margins(self):
+        """Return cursor-adjacent layer-shell margins from Hyprland."""
+        try:
+            import subprocess
+            point = json.loads(subprocess.check_output(
+                ["hyprctl", "cursorpos", "-j"], text=True, stderr=subprocess.DEVNULL
+            ))
+            monitors = json.loads(subprocess.check_output(
+                ["hyprctl", "monitors", "-j"], text=True, stderr=subprocess.DEVNULL
+            ))
+            x, y = point["x"], point["y"]
+            monitor = next((m for m in monitors if m["x"] <= x < m["x"] + m["width"]
+                            and m["y"] <= y < m["y"] + m["height"]), monitors[0])
+            # Hyprland's cursor position and this layer-shell surface's
+            # margins use the same output coordinate space. Dividing by the
+            # monitor scale moves the popup far toward the top-left on HiDPI.
+            left = int(x - monitor["x"]) + 14
+            top = max(8, int(y - monitor["y"]) - 58)
+            return left, top
+        except Exception:
+            # The preview still works on non-Hyprland compositors; it simply
+            # appears at the top-left rather than failing the dictation flow.
+            return 24, 24
+
+    def _set_position(self, left, top):
+        Gtk4LayerShell.set_margin(self, Gtk4LayerShell.Edge.LEFT, left)
+        Gtk4LayerShell.set_margin(self, Gtk4LayerShell.Edge.TOP, top)
+
+    def _place_at_cursor(self):
+        self._set_position(*self._cursor_margins())
+
+    def show_text(self, text):
+        self._place_at_cursor()
+        self.surface.set_text(text)
+        self.set_visible(True)
+        if self._follow_thread is None or not self._follow_thread.is_alive():
+            import threading
+            self._follow_stop = threading.Event()
+            self._follow_thread = threading.Thread(target=self._follow_cursor, daemon=True)
+            self._follow_thread.start()
+
+    def hide_preview(self):
+        self.set_visible(False)
+        if self._follow_stop is not None:
+            self._follow_stop.set()
+        self._follow_thread = None
+        self._follow_stop = None
+
+    def _follow_cursor(self):
+        # hyprctl can take a few milliseconds. Querying it from GTK's main
+        # thread made the entire overlay hitch whenever the pointer moved.
+        # The worker only gathers coordinates; GTK updates stay on its thread.
+        stop = self._follow_stop
+        while stop is not None and not stop.is_set():
+            left, top = self._cursor_margins()
+            GLib.idle_add(self._set_position, left, top)
+            stop.wait(0.033)
+
+
 class UIManager:
     def __init__(self, config, audio_recorder):
         self.config = config
@@ -350,26 +488,38 @@ class UIManager:
             settings.set_property("gtk-application-prefer-dark-theme", False)
         self.app.connect("activate", self.on_activate)
         self.overlay = None
+        self.preview = None
 
     def on_activate(self, app):
         self.app.hold()
         if not self.overlay:
             self.overlay = DictationOverlay(app, self.config, self.audio_recorder)
             self.overlay.set_visible(True)
+            self.preview = LivePreviewPopup(app)
 
     def show(self):
         if self.overlay:
             self.overlay.visualizer.is_processing = False
             self.overlay.visualizer.animate_to(1.0)
+        if self.preview:
+            self.preview.hide_preview()
 
     def hide(self):
         if self.overlay:
             self.overlay.visualizer.is_processing = False
             self.overlay.visualizer.animate_to(0.0)
+        if self.preview:
+            self.preview.hide_preview()
 
     def set_processing_state(self):
         if self.overlay:
             self.overlay.visualizer.is_processing = True
+        if self.preview:
+            self.preview.hide_preview()
+
+    def set_live_text(self, text):
+        if self.preview:
+            self.preview.show_text(text)
 
     def run(self):
         self.app.run(None)

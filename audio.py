@@ -11,6 +11,11 @@ class AudioRecorder:
         self.channels = 1
         self.is_recording = False
         self.audio_queue = queue.Queue()
+        # A separate, lock-protected copy lets the live transcription worker
+        # inspect the recording without draining the queue used by the final
+        # transcription when recording stops.
+        self._recording_chunks = []
+        self._chunks_lock = threading.Lock()
         self.stream = None
         self.volume_level = 0.0
 
@@ -24,7 +29,10 @@ class AudioRecorder:
             else:
                 mono_data = indata.flatten()
                 
-            self.audio_queue.put(mono_data.copy())
+            chunk = mono_data.copy()
+            self.audio_queue.put(chunk)
+            with self._chunks_lock:
+                self._recording_chunks.append(chunk)
             # Calculate volume level for visualizer (RMS)
             rms = np.sqrt(np.mean(mono_data**2))
             # Normalize and smooth slightly
@@ -33,6 +41,8 @@ class AudioRecorder:
     def start_recording(self):
         self.is_recording = True
         self.audio_queue = queue.Queue()
+        with self._chunks_lock:
+            self._recording_chunks = []
         self.volume_level = 0.0
         self.actual_sample_rate = self.sample_rate
         
@@ -93,6 +103,14 @@ class AudioRecorder:
                 audio = np.interp(time_new, time_old, audio).astype('float32')
             return audio
         return np.array([])
+
+    def get_recording_snapshot(self):
+        """Return a stable copy of audio captured so far for live previews."""
+        with self._chunks_lock:
+            chunks = list(self._recording_chunks)
+        if not chunks:
+            return np.array([], dtype="float32")
+        return np.concatenate(chunks, axis=0).flatten()
     
     def get_volume_level(self):
         return self.volume_level

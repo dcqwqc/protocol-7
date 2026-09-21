@@ -92,6 +92,8 @@ class Protocol7App:
         # tell "start a new dictation" apart from "abandon the one in flight".
         self.is_processing = False
         self.cancel_requested = False
+        self._live_stop = threading.Event()
+        self._live_thread = None
 
         # KEY_LEFTCTRL is 29
         self.hotkey = HotkeyListener(self.config.get("hotkey_keycode", 29), self.on_hotkey_trigger)
@@ -118,6 +120,7 @@ class Protocol7App:
             self.is_active = True
             self.cancel_requested = False
             self.audio_recorder.start_recording()
+            self._start_live_preview()
             
             # Show UI on main thread safely
             import gi
@@ -128,6 +131,9 @@ class Protocol7App:
             # Stop dictation
             log_debug("Dictation stopped")
             self.is_active = False
+            # Signal the partial worker now; process_audio joins it off the
+            # hotkey listener thread before the final inference begins.
+            self._live_stop.set()
             
             # Update UI state to processing
             self.is_processing = True
@@ -138,6 +144,39 @@ class Protocol7App:
             # Process in background so we don't block GTK main loop
             threading.Thread(target=self.process_audio, daemon=True).start()
 
+    def _start_live_preview(self):
+        self._live_stop.clear()
+        self._live_thread = threading.Thread(target=self._live_preview_loop, daemon=True)
+        self._live_thread.start()
+
+    def _stop_live_preview(self):
+        self._live_stop.set()
+        if self._live_thread and self._live_thread.is_alive():
+            # Never run a final and partial transcription against the same
+            # CTranslate2 model concurrently. The join is bounded so releasing
+            # the hotkey cannot freeze the UI if a backend misbehaves.
+            self._live_thread.join(timeout=5)
+        self._live_thread = None
+
+    def _live_preview_loop(self):
+        """Publish a best-effort partial transcript every two seconds."""
+        import time
+        # Let enough speech accumulate for Whisper to produce useful words.
+        if self._live_stop.wait(1.2):
+            return
+        while not self._live_stop.is_set() and self.is_active:
+            audio_data = self.audio_recorder.get_recording_snapshot()
+            if len(audio_data) >= 8000:
+                try:
+                    text = self.whisper_engine.transcribe(audio_data, live=True)
+                    if text and not self._live_stop.is_set():
+                        GLib.idle_add(self.ui_manager.set_live_text, text)
+                except Exception as error:
+                    log_debug(f"Live transcription failed: {error}")
+            # The preview is deliberately sampled, not streamed token by
+            # token: this keeps CPU use bounded on machines without CUDA.
+            self._live_stop.wait(2.0)
+
     def process_audio(self):
         import time
         import traceback
@@ -146,6 +185,7 @@ class Protocol7App:
         start_time = time.time()
         
         try:
+            self._stop_live_preview()
             audio_data = self.audio_recorder.stop_recording()
             audio_time = time.time()
             log_debug(f"Audio collected and resampled in {audio_time - start_time:.2f}s")
@@ -202,16 +242,18 @@ class Protocol7App:
 
     def paste_text(self, text):
         try:
-            with open("/tmp/protocol7_wtype.fifo", "w") as f:
-                # The newline is a delimiter, not part of the text. The daemon
-                # reads the fifo line by line, so without one the transcription
-                # is handed over and then simply sits in the pipe -- the whole
-                # pipeline succeeds and nothing is ever typed. Embedded
-                # newlines would split one utterance into several, so they are
-                # flattened to spaces.
-                f.write(text.replace("\r", " ").replace("\n", " ") + "\n")
+            # Run wtype for this utterance rather than feeding a long-lived
+            # stdin/FIFO daemon. wtype emits its virtual-keyboard events when
+            # its input ends; a persistent pipe can therefore leave text
+            # queued forever and keep the overlay in its loading state.
+            import subprocess
+            subprocess.run(
+                ["wtype", text.replace("\r", " ").replace("\n", " ")],
+                check=True,
+                env=_env_without_layer_shell(),
+            )
         except Exception as e:
-            log_debug(f"Error writing to wtype daemon fifo: {e}")
+            log_debug(f"Error pasting text with wtype: {e}")
 
     def run(self):
         log_debug("Starting Protocol-7...")

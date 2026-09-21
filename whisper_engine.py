@@ -6,23 +6,27 @@ class WhisperEngine:
         self.config = config
         self.model = None
         self.current_model_size = None
+        import threading
+        self._lock = threading.Lock()
 
     def _load_model(self):
-        model_size = self.config.get("model_size", "tiny.en")
-        
-        # If running on CPU, int8 is significantly faster and uses less memory
-        compute_type = self.config.get("compute_type", "int8")
-        
-        if self.model is None or self.current_model_size != model_size:
-            print(f"Loading Whisper model: {model_size} (compute_type: {compute_type})...")
-            import time
-            start_load = time.time()
-            self.model = WhisperModel(model_size, device="auto", compute_type=compute_type)
-            self.current_model_size = model_size
-            print(f"Model loaded successfully in {time.time() - start_load:.2f}s.")
+        with self._lock:
+            model_size = self.config.get("model_size", "tiny.en")
+            
+            # If running on CPU, int8 is significantly faster and uses less memory
+            compute_type = self.config.get("compute_type", "int8")
+            
+            if self.model is None or self.current_model_size != model_size:
+                print(f"Loading Whisper model: {model_size} (compute_type: {compute_type})...")
+                import time
+                start_load = time.time()
+                self.model = WhisperModel(model_size, device="auto", compute_type=compute_type)
+                self.current_model_size = model_size
+                print(f"Model loaded successfully in {time.time() - start_load:.2f}s.")
 
-    def transcribe(self, audio_data):
-        if len(audio_data) == 0:
+    def transcribe(self, audio_data, live=False):
+        # Reject audio less than 0.5 seconds (at 16000Hz, 0.5s = 8000 samples)
+        if len(audio_data) < 8000:
             return ""
 
         self._load_model()
@@ -53,11 +57,10 @@ class WhisperEngine:
             segments, info = self.model.transcribe(
                 audio_data, 
                 beam_size=1, 
-                vad_filter=True,
-                vad_parameters=dict(
-                    min_silence_duration_ms=2000,
-                    speech_pad_ms=400
-                ),
+                # VAD makes final dictations cleaner, but it waits for a
+                # silence boundary and makes partial results feel delayed.
+                vad_filter=not live,
+                vad_parameters=dict(min_silence_duration_ms=2000, speech_pad_ms=400),
                 **kwargs
             )
             text = "".join(segment.text for segment in segments)
@@ -69,11 +72,8 @@ class WhisperEngine:
                 segments, info = self.model.transcribe(
                     audio_data, 
                     beam_size=1, 
-                    vad_filter=True,
-                    vad_parameters=dict(
-                        min_silence_duration_ms=2000,
-                        speech_pad_ms=400
-                    ),
+                    vad_filter=not live,
+                    vad_parameters=dict(min_silence_duration_ms=2000, speech_pad_ms=400),
                     **kwargs
                 )
                 text = "".join(segment.text for segment in segments)
