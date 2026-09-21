@@ -3,12 +3,17 @@ import time
 import os
 import threading
 import ctypes
+from datetime import datetime
 
 def log_debug(msg):
+    # Timestamped so a line can be placed against a run. Without this the
+    # log says what happened but never when, and two interleaved pipelines
+    # are indistinguishable from one.
+    stamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
     log_path = os.path.join(os.environ.get("TEMP", "/tmp"), "protocol7_debug.log")
     try:
         with open(log_path, "a") as f:
-            f.write(f"[HOTKEY_WIN] {msg}\n")
+            f.write(f"[{stamp}] [HOTKEY_WIN] {msg}\n")
     except:
         pass
 

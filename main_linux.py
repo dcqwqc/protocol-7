@@ -9,12 +9,17 @@ from audio import AudioRecorder
 from whisper_engine import WhisperEngine
 from ui_linux import UIManager
 from llm_rewriter import LLMRewriter
+from datetime import datetime
 
 def log_debug(msg):
+    # Timestamped so a line can be placed against a run. Without this the
+    # log says what happened but never when, and two interleaved pipelines
+    # are indistinguishable from one.
+    stamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
     log_path = "/tmp/protocol7_debug.log"
     try:
         with open(log_path, "a") as f:
-            f.write(f"[MAIN_LINUX] {msg}\n")
+            f.write(f"[{stamp}] [MAIN_LINUX] {msg}\n")
     except:
         pass
 

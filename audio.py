@@ -2,6 +2,7 @@ import sounddevice as sd
 import numpy as np
 import threading
 import queue
+from datetime import datetime
 
 class AudioRecorder:
     def __init__(self, device_id=None, sample_rate=16000):
@@ -49,7 +50,7 @@ class AudioRecorder:
                 import os
                 try:
                     with open(os.path.join(os.environ.get("TEMP", "/tmp"), "protocol7_debug.log"), "a") as f:
-                        f.write(f"[AUDIO] Initial 16k Mono stream failed: {e}\n")
+                        f.write(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] [AUDIO] Initial 16k Mono stream failed: {e}\n")
                 except: pass
                 
                 # Ultimate fallback: Let PortAudio/Windows auto-negotiate the exact required hardware format
@@ -65,7 +66,7 @@ class AudioRecorder:
             import os
             try:
                 with open(os.path.join(os.environ.get("TEMP", "/tmp"), "protocol7_debug.log"), "a") as f:
-                    f.write(f"[AUDIO] Error starting audio recording completely: {e}\n")
+                    f.write(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] [AUDIO] Error starting audio recording completely: {e}\n")
             except: pass
             print(f"Error starting audio recording: {e}")
             self.is_recording = False
