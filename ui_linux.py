@@ -175,15 +175,19 @@ class OverlaySurface(Gtk.DrawingArea):
             return True  # nothing visible; skip the work but keep the timer
 
         if self.is_processing:
-            # Unhurried but clearly alive. The first attempt at "calm" was
-            # 0.045, which at 60fps is slow enough to look like a still image
-            # with a drift -- there has to be enough motion to say the thing is
-            # working, or it reads as frozen.
-            self.wave_offset += 0.11
+            # Tuned by measuring the travel rather than by eye, because the
+            # speed was never the limiting factor. Damping the follow factor to
+            # 0.12 left the centre bar moving under five pixels out of
+            # eighteen, and no wave speed rescues that -- the bars simply
+            # cannot keep up with the target, so the whole row sits nearly
+            # still. Follow closely enough to track, over a band that never
+            # collapses to nothing or reaches the ceiling: about ten pixels of
+            # travel between four and fourteen.
+            self.wave_offset += 0.13
             for i in range(len(self.bars)):
                 phase = math.sin(self.wave_offset + i * 0.45)
-                target = 0.30 + 0.35 * (phase + 1.0) * 0.5
-                self.bars[i] += (target - self.bars[i]) * 0.12
+                target = 0.20 + 0.60 * (phase + 1.0) * 0.5
+                self.bars[i] += (target - self.bars[i]) * 0.28
             self.queue_draw()
             return True
 
