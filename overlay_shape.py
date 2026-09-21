@@ -102,11 +102,18 @@ def panel_path(cr, width, height, progress, panel_w, panel_h,
     # reach above the panel's own top edge and the outline would cross itself.
     fr = max(0.0, min(fillet_r, ph - r, (width - panel_w) * 0.5))
 
+    # The foot reaches only as far as the fillets need and no further.
+    #
+    # It used to run the full width of the window, on the theory that it was
+    # covering the shell's own bottom border and would therefore be invisible.
+    # It is not: the border is not always there, and where it is not, a pale
+    # bar several hundred pixels wide appears under the panel with nothing to
+    # explain it. The fillets are what need something to curve into, and they
+    # only need it for their own width.
     cr.new_path()
-    cr.move_to(0.0, height)
-    cr.line_to(0.0, baseline)
+    cr.move_to(x0 - fr, height)
     cr.line_to(x0 - fr, baseline)
-    # Concave: curves up off the border into the panel's left flank.
+    # Concave: curves up off the foot into the panel's left flank.
     if fr > 0:
         cr.arc_negative(x0 - fr, baseline - fr, fr, 0.5 * math.pi, 0.0)
     cr.line_to(x0, ty + r)
@@ -117,7 +124,31 @@ def panel_path(cr, width, height, progress, panel_w, panel_h,
     # Concave again, mirrored.
     if fr > 0:
         cr.arc_negative(x1 + fr, baseline - fr, fr, math.pi, 0.5 * math.pi)
-    cr.line_to(width, baseline)
-    cr.line_to(width, height)
+    cr.line_to(x1 + fr, height)
     cr.close_path()
     return True
+
+
+def draw_shadow(cr, rgba, spread=11, strength=0.055):
+    """Lay a soft shadow under whatever path is currently set.
+
+    Cairo has no blur, and blurring a surface per frame in Python is not worth
+    it at this size. Stroking the outline repeatedly, widening and fading as it
+    goes, gives the same falloff for a handful of path operations -- close
+    enough that it reads as a shadow rather than as an outline, which is all it
+    has to do.
+
+    Call with the path already traced; the path survives, so the caller can
+    still fill it afterwards.
+    """
+    r, g, b = rgba
+    cr.set_line_join(1)  # round
+    for i in range(spread, 0, -1):
+        # Widest first and faintest; each pass narrows and darkens, so the
+        # result is dense against the edge and gone by the outside. Getting
+        # this the other way round -- widest darkest -- does not look like a
+        # soft shadow, it looks like the panel has been outlined in grey.
+        alpha = strength * (1.0 - (i - 1) / float(spread)) ** 2
+        cr.set_source_rgba(r, g, b, alpha)
+        cr.set_line_width(i * 2.0)
+        cr.stroke_preserve()

@@ -67,16 +67,35 @@ class Protocol7App:
             time.sleep(0.2)
             
         self.is_active = False
-        
+        # Set while the transcription pipeline is running, so the hotkey can
+        # tell "start a new dictation" apart from "abandon the one in flight".
+        self.is_processing = False
+        self.cancel_requested = False
+
         # KEY_LEFTCTRL is 29
         self.hotkey = HotkeyListener(self.config.get("hotkey_keycode", 29), self.on_hotkey_trigger)
         
     def on_hotkey_trigger(self):
         log_debug("HOTKEY TRIGGERED")
+
+        # A press while the pipeline is still working means "drop it", not
+        # "start another one". Without this the overlay never closes on that
+        # press: is_active is already False by then, so the trigger fell through
+        # to starting a fresh dictation and the panel stayed up for that instead.
+        if self.is_processing:
+            log_debug("Dictation cancelled during processing")
+            self.cancel_requested = True
+            self.is_processing = False
+            import gi
+            from gi.repository import GLib
+            GLib.idle_add(self.ui_manager.hide)
+            return
+
         if not self.is_active:
             # Start dictation
             log_debug("Dictation started")
             self.is_active = True
+            self.cancel_requested = False
             self.audio_recorder.start_recording()
             
             # Show UI on main thread safely
@@ -90,6 +109,7 @@ class Protocol7App:
             self.is_active = False
             
             # Update UI state to processing
+            self.is_processing = True
             import gi
             from gi.repository import GLib
             GLib.idle_add(self.ui_manager.set_processing_state)
@@ -126,6 +146,10 @@ class Protocol7App:
                     if clean_text != text:
                         log_debug(f"Rewritten to: {clean_text}")
                     
+                    if self.cancel_requested:
+                        log_debug("Discarding transcription: cancelled by hotkey")
+                        return
+
                     # Hide UI before pasting so Wayland compositor restores focus to terminal
                     GLib.idle_add(self.ui_manager.hide)
                     time.sleep(0.4) # Wait 400ms to ensure the user has physically released the Ctrl key
@@ -151,6 +175,7 @@ class Protocol7App:
             log_debug(f"Fatal error in audio processing pipeline: {e}")
             log_debug(traceback.format_exc())
         finally:
+            self.is_processing = False
             # ALWAYS hide the UI, no matter what happens, to prevent infinite loading animation!
             GLib.idle_add(self.ui_manager.hide)
 

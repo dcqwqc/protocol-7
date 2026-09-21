@@ -13,7 +13,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Gtk4LayerShell', '1.0')
 from gi.repository import Gtk, Gtk4LayerShell, GLib, Gdk, cairo
 
-from overlay_shape import SLIDE_MS, ease_spatial, panel_path
+from overlay_shape import SLIDE_MS, draw_shadow, ease_spatial, panel_path
 
 # Panel geometry, in logical pixels. The window around it is fixed and never
 # resized: a layer-shell surface that changes size mid-animation costs a
@@ -223,6 +223,10 @@ class OverlaySurface(Gtk.DrawingArea):
         if not panel_path(cr, width, height, eased, PANEL_W, PANEL_H,
                           CORNER_R, FILLET_R, border, dx):
             return
+
+        # Shadow first, under the panel, so it sits between the overlay and
+        # whatever is behind it rather than on top of either.
+        draw_shadow(cr, (0.0, 0.0, 0.0))
 
         sr, sg, sb, _ = hex_to_rgba(surface_hex)
         cr.set_source_rgba(sr, sg, sb, 1.0)
