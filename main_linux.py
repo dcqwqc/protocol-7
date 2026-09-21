@@ -18,6 +18,22 @@ def log_debug(msg):
     except:
         pass
 
+def _env_without_layer_shell():
+    """A child environment with the layer-shell preload removed.
+
+    The main process forces gtk4-layer-shell in via LD_PRELOAD so the overlay
+    is reliably a layer surface. Children inherit that, and the preload hooks
+    GDK in processes that never initialise GTK the same way -- the tray dies on
+    `gdk_display_manager_get() was called before gtk_init()`. Only the process
+    that draws the overlay wants it.
+    """
+    import os
+    env = os.environ.copy()
+    env.pop("LD_PRELOAD", None)
+    env.pop("PROTOCOL7_PRELOADED", None)
+    return env
+
+
 class TrayIcon:
     def __init__(self, app):
         self.app = app
@@ -32,7 +48,7 @@ class TrayIcon:
         APP_DIR = os.path.dirname(os.path.abspath(__file__))
         tray_path = os.path.join(APP_DIR, "tray.py")
         self.tray_log = open("/tmp/protocol7_tray.log", "w")
-        self.process = subprocess.Popen([sys.executable, tray_path, str(os.getpid())], cwd=APP_DIR, stdout=self.tray_log, stderr=subprocess.STDOUT)
+        self.process = subprocess.Popen([sys.executable, tray_path, str(os.getpid())], cwd=APP_DIR, stdout=self.tray_log, stderr=subprocess.STDOUT, env=_env_without_layer_shell())
 
     def stop(self):
         if self.process:
@@ -62,7 +78,7 @@ class Protocol7App:
             import sys
             app_dir = os.path.dirname(os.path.abspath(__file__))
             daemon_path = os.path.join(app_dir, 'wtype_daemon.py')
-            subprocess.Popen([sys.executable, daemon_path], start_new_session=True)
+            subprocess.Popen([sys.executable, daemon_path], start_new_session=True, env=_env_without_layer_shell())
             import time
             time.sleep(0.2)
             

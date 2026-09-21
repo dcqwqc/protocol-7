@@ -66,14 +66,21 @@ def panel_path(cr, width, height, progress, panel_w, panel_h,
     when it is fully out. The fillets shrink with it, so the join stays correct
     at every point of the slide instead of only at the end.
 
-    When `border` is zero there is no shell border to rise out of, so the panel
-    is drawn as a free-standing pill with rounded lower corners -- the same
-    widget still looks deliberate on a desktop that is not Caelestia.
+    `border` is accepted and ignored: the panel meets the screen edge directly.
     """
     if progress <= 0.0:
         return False
 
-    baseline = height - border
+    # The panel sits on the screen edge itself, not on a strip standing in for
+    # the shell's border.
+    #
+    # Drawing that strip was a mistake twice over. It assumed a border was
+    # always there to hide it, and where there was not one it appeared as a pale
+    # bar under the panel; and it assumed the strip's colour matched whatever it
+    # covered, which is only true if the theme file and the live palette agree.
+    # Flaring straight off the bottom edge needs neither assumption, and looks
+    # the same wherever it runs.
+    baseline = height
     ph = panel_h * progress
     if ph <= 0.5:
         return False
@@ -87,33 +94,13 @@ def panel_path(cr, width, height, progress, panel_w, panel_h,
 
     r = min(corner_r, panel_w * 0.5, ph)
 
-    if border <= 0:
-        # No border to merge with: a rounded rectangle, bottom corners included.
-        br = min(corner_r, ph * 0.5)
-        cr.new_path()
-        cr.arc(x0 + r, ty + r, r, math.pi, 1.5 * math.pi)
-        cr.arc(x1 - r, ty + r, r, 1.5 * math.pi, 2.0 * math.pi)
-        cr.arc(x1 - br, baseline - br, br, 0.0, 0.5 * math.pi)
-        cr.arc(x0 + br, baseline - br, br, 0.5 * math.pi, math.pi)
-        cr.close_path()
-        return True
-
     # The fillet cannot be deeper than the panel is tall, or the arc would
     # reach above the panel's own top edge and the outline would cross itself.
     fr = max(0.0, min(fillet_r, ph - r, (width - panel_w) * 0.5))
 
-    # The foot reaches only as far as the fillets need and no further.
-    #
-    # It used to run the full width of the window, on the theory that it was
-    # covering the shell's own bottom border and would therefore be invisible.
-    # It is not: the border is not always there, and where it is not, a pale
-    # bar several hundred pixels wide appears under the panel with nothing to
-    # explain it. The fillets are what need something to curve into, and they
-    # only need it for their own width.
     cr.new_path()
-    cr.move_to(x0 - fr, height)
-    cr.line_to(x0 - fr, baseline)
-    # Concave: curves up off the foot into the panel's left flank.
+    cr.move_to(x0 - fr, baseline)
+    # Concave: curves up off the screen edge into the panel's left flank.
     if fr > 0:
         cr.arc_negative(x0 - fr, baseline - fr, fr, 0.5 * math.pi, 0.0)
     cr.line_to(x0, ty + r)
@@ -124,7 +111,6 @@ def panel_path(cr, width, height, progress, panel_w, panel_h,
     # Concave again, mirrored.
     if fr > 0:
         cr.arc_negative(x1 + fr, baseline - fr, fr, math.pi, 0.5 * math.pi)
-    cr.line_to(x1 + fr, height)
     cr.close_path()
     return True
 
