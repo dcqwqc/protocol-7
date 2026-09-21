@@ -198,7 +198,13 @@ class Protocol7App:
     def paste_text(self, text):
         try:
             with open("/tmp/protocol7_wtype.fifo", "w") as f:
-                f.write(text)
+                # The newline is a delimiter, not part of the text. The daemon
+                # reads the fifo line by line, so without one the transcription
+                # is handed over and then simply sits in the pipe -- the whole
+                # pipeline succeeds and nothing is ever typed. Embedded
+                # newlines would split one utterance into several, so they are
+                # flattened to spaces.
+                f.write(text.replace("\r", " ").replace("\n", " ") + "\n")
         except Exception as e:
             log_debug(f"Error writing to wtype daemon fifo: {e}")
 

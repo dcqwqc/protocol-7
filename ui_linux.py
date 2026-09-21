@@ -175,9 +175,11 @@ class OverlaySurface(Gtk.DrawingArea):
             return True  # nothing visible; skip the work but keep the timer
 
         if self.is_processing:
-            # Slow and shallow. This runs while the model is thinking, and a
-            # fast bright wave there reads as urgency rather than as waiting.
-            self.wave_offset += 0.045
+            # Unhurried but clearly alive. The first attempt at "calm" was
+            # 0.045, which at 60fps is slow enough to look like a still image
+            # with a drift -- there has to be enough motion to say the thing is
+            # working, or it reads as frozen.
+            self.wave_offset += 0.11
             for i in range(len(self.bars)):
                 phase = math.sin(self.wave_offset + i * 0.45)
                 target = 0.30 + 0.35 * (phase + 1.0) * 0.5

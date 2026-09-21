@@ -12,6 +12,8 @@ with os.fdopen(fd, 'r') as f:
     for line in f:
         if line.strip() == "QUIT_DAEMON":
             break
-        proc.stdin.write(line)
+        # Strip the delimiter: it marks the end of an utterance, and typing it
+        # would press Enter into whatever has focus.
+        proc.stdin.write(line.rstrip("\r\n"))
         proc.stdin.flush()
 proc.terminate()
