@@ -180,20 +180,22 @@ class OverlaySurface(Gtk.DrawingArea):
             self.wave_offset += 0.045
             for i in range(len(self.bars)):
                 phase = math.sin(self.wave_offset + i * 0.45)
-                target = 0.18 + 0.22 * (phase + 1.0) * 0.5
+                target = 0.30 + 0.35 * (phase + 1.0) * 0.5
                 self.bars[i] += (target - self.bars[i]) * 0.12
             self.queue_draw()
             return True
 
         volume = self.audio_recorder.get_volume_level()
-        if volume < 0.04:
+        if volume < 0.02:
             volume = 0.0
         else:
-            # A gentler curve and no headroom multiplier. The old one raised
-            # quiet speech to near full height and then multiplied it, so
-            # talking calmly still pinned every bar to the ceiling -- the meter
-            # had nothing left to say about actually raising your voice.
-            volume = min(1.0, volume ** 0.75)
+            # The recorder reports rms * 10, so ordinary speech arrives around
+            # 0.1 to 0.4. Dropping the gain entirely was an overcorrection: at
+            # the gentler curve alone, talking normally moved each bar one or
+            # two pixels out of eighteen, which is alive but indistinguishable
+            # from dead. This keeps enough gain to read clearly while still
+            # leaving headroom for actually raising your voice.
+            volume = min(1.0, (volume ** 0.55) * 1.5)
 
         for i in range(len(self.bars)):
             dist = abs(i - (len(self.bars) - 1) / 2.0)
