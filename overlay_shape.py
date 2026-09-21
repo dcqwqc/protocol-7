@@ -20,10 +20,10 @@ import math
 # and settles, rather than easing politely into position.
 EXPRESSIVE_FAST_SPATIAL = (0.42, 1.67, 0.21, 0.9)
 
-# The shell's own duration for the same curve, scaled the way the window board
-# scales it: a reveal you did not ask for should already be finished by the time
-# you look at it.
-SLIDE_MS = 235.0
+# Slower than the shell's panels, deliberately. This one appears because you
+# started talking and leaves when you stop, so it should feel like it is keeping
+# pace with you rather than snapping in and out around you.
+SLIDE_MS = 420.0
 
 
 def cubic_bezier(p1x, p1y, p2x, p2y):
@@ -59,7 +59,7 @@ ease_spatial = cubic_bezier(*EXPRESSIVE_FAST_SPATIAL)
 
 
 def panel_path(cr, width, height, progress, panel_w, panel_h,
-               corner_r, fillet_r, border):
+               corner_r, fillet_r, border, dx=0.0):
     """Trace the overlay's outline: border strip, panel, and the joins between.
 
     `progress` is 0 when the panel is entirely hidden behind the border and 1
@@ -78,7 +78,10 @@ def panel_path(cr, width, height, progress, panel_w, panel_h,
     if ph <= 0.5:
         return False
 
-    x0 = (width - panel_w) * 0.5
+    # `dx` shifts the panel off the window's centre. The shell's own surfaces
+    # are centred in the area right of the bar, not on the screen, so a screen-
+    # centred panel sits visibly left of everything else it lines up with.
+    x0 = (width - panel_w) * 0.5 + dx
     x1 = x0 + panel_w
     ty = baseline - ph
 

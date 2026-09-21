@@ -19,11 +19,13 @@ from overlay_shape import SLIDE_MS, ease_spatial, panel_path
 # resized: a layer-shell surface that changes size mid-animation costs a
 # configure, an ack and a commit every frame, and the result reads as the panel
 # inflating rather than sliding.
-PANEL_W = 148
-PANEL_H = 44
-CORNER_R = 14
-FILLET_R = 16
-WINDOW_W = PANEL_W + FILLET_R * 2 + 48
+PANEL_W = 112
+PANEL_H = 30
+CORNER_R = 10
+FILLET_R = 12
+# Wide enough for the panel, both fillets, and the shift that lines it up with
+# the shell's own centre -- the window itself never changes size.
+WINDOW_W = PANEL_W + FILLET_R * 2 + 140
 WINDOW_H = PANEL_H + 40
 
 
@@ -55,6 +57,19 @@ def get_caelestia_colors():
     except Exception:
         pass
     return colors
+
+
+def get_caelestia_offset():
+    """How far right of screen centre the shell centres its own surfaces.
+
+    The bar occupies the left edge, so Caelestia's drawers are centred in what
+    is left over rather than on the screen. A panel centred on the screen sits
+    half a bar-width left of everything it is supposed to line up with, which is
+    small enough to look like a mistake rather than a choice.
+    """
+    inner, padding = 40, 8  # Caelestia's bar.innerWidth and padding.small
+    bar = inner + max(padding, get_caelestia_border()) * 2
+    return bar * 0.5
 
 
 def get_caelestia_border():
@@ -95,7 +110,7 @@ class OverlaySurface(Gtk.DrawingArea):
         self.set_content_height(WINDOW_H)
         self.set_draw_func(self.on_draw)
 
-        self.bars = [0.0] * 10
+        self.bars = [0.0] * 9
         self.is_processing = False
         self.wave_offset = 0.0
 
@@ -113,8 +128,10 @@ class OverlaySurface(Gtk.DrawingArea):
     # ---- motion ---------------------------------------------------------
 
     def animate_to(self, target):
-        if target == self.target and self._tick is None:
-            return
+        # Deliberately no early return when the target is unchanged. The panel
+        # has to end up where it was told to go even if a previous animation
+        # was interrupted, retargeted, or never started -- skipping the call is
+        # how it ends up frozen half out with nothing left to move it.
         self.target = target
         self._anim_from = self.progress
         self._anim_start = None
@@ -148,26 +165,36 @@ class OverlaySurface(Gtk.DrawingArea):
             return True  # nothing visible; skip the work but keep the timer
 
         if self.is_processing:
-            self.wave_offset += 0.15
+            # Slow and shallow. This runs while the model is thinking, and a
+            # fast bright wave there reads as urgency rather than as waiting.
+            self.wave_offset += 0.045
             for i in range(len(self.bars)):
-                target = (math.sin(self.wave_offset + i * 0.5) + 1.0) * 0.5
-                self.bars[i] += (target - self.bars[i]) * 0.3
+                phase = math.sin(self.wave_offset + i * 0.45)
+                target = 0.18 + 0.22 * (phase + 1.0) * 0.5
+                self.bars[i] += (target - self.bars[i]) * 0.12
             self.queue_draw()
             return True
 
         volume = self.audio_recorder.get_volume_level()
-        if volume < 0.02:
+        if volume < 0.04:
             volume = 0.0
         else:
-            volume = min(1.0, volume ** 0.5)
+            # A gentler curve and no headroom multiplier. The old one raised
+            # quiet speech to near full height and then multiplied it, so
+            # talking calmly still pinned every bar to the ceiling -- the meter
+            # had nothing left to say about actually raising your voice.
+            volume = min(1.0, volume ** 0.75)
 
         for i in range(len(self.bars)):
             dist = abs(i - (len(self.bars) - 1) / 2.0)
-            weight = max(0.3, 1.0 - (dist / (len(self.bars) / 2.0)))
-            target = volume * weight * 1.8
+            weight = max(0.35, 1.0 - (dist / (len(self.bars) / 2.0)))
+            target = volume * weight
             if volume > 0:
-                target *= random.uniform(0.85, 1.15)
-            self.bars[i] += (target - self.bars[i]) * 0.7
+                target *= random.uniform(0.94, 1.06)
+            # Rises briskly, falls slowly: the jitter reads as speech rather
+            # than as flicker.
+            k = 0.45 if target > self.bars[i] else 0.16
+            self.bars[i] += (target - self.bars[i]) * k
 
         self.queue_draw()
         return True
@@ -190,10 +217,11 @@ class OverlaySurface(Gtk.DrawingArea):
         # Only merge with a border that is actually there. Off Caelestia the
         # panel is a free-standing pill instead, which is the honest shape.
         border = get_caelestia_border() if use_caelestia else 0
+        dx = get_caelestia_offset() if use_caelestia else 0.0
 
         eased = max(0.0, min(1.0, self.progress))
         if not panel_path(cr, width, height, eased, PANEL_W, PANEL_H,
-                          CORNER_R, FILLET_R, border):
+                          CORNER_R, FILLET_R, border, dx):
             return
 
         sr, sg, sb, _ = hex_to_rgba(surface_hex)
@@ -207,16 +235,16 @@ class OverlaySurface(Gtk.DrawingArea):
         # their proportions the whole way up.
         baseline = height - border
         cr.translate(0.0, (1.0 - eased) * PANEL_H)
-        self.draw_bars(cr, width, baseline, accent_hex)
+        self.draw_bars(cr, width, baseline, accent_hex, dx)
 
-    def draw_bars(self, cr, width, baseline, accent_hex):
+    def draw_bars(self, cr, width, baseline, accent_hex, dx=0.0):
         r, g, b, _ = hex_to_rgba(accent_hex)
-        inner_w = PANEL_W - 28
-        x_left = (width - inner_w) * 0.5
+        inner_w = PANEL_W - 24
+        x_left = (width - inner_w) * 0.5 + dx
         mid_y = baseline - PANEL_H * 0.5
         bar_slot = inner_w / len(self.bars)
-        thickness = 5.0
-        max_h = PANEL_H - 16
+        thickness = 4.0
+        max_h = PANEL_H - 12
 
         cr.set_source_rgba(r, g, b, 0.85)
         cr.set_line_width(thickness)
