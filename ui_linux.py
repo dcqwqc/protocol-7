@@ -161,6 +161,16 @@ class OverlaySurface(Gtk.DrawingArea):
     # ---- bars -----------------------------------------------------------
 
     def update_bars(self):
+        try:
+            return self._update_bars()
+        except Exception:
+            # Never let this source die. PyGObject drops a timeout whose
+            # callback raises, and the only symptom is that the bars stop
+            # moving and the processing wave never runs again -- for the rest
+            # of the session, with nothing on screen to say why.
+            return True
+
+    def _update_bars(self):
         if self.progress <= 0.001 and not self._tick:
             return True  # nothing visible; skip the work but keep the timer
 
@@ -237,7 +247,10 @@ class OverlaySurface(Gtk.DrawingArea):
 
         # Slide the bars with the panel instead of stretching them: they keep
         # their proportions the whole way up.
-        baseline = height - border
+        # The panel sits on the screen edge, so its centre is measured from
+        # there. This was still measuring from a border inset that the shape
+        # stopped using, which drew every bar the border's thickness too high.
+        baseline = height
         cr.translate(0.0, (1.0 - eased) * PANEL_H)
         self.draw_bars(cr, width, baseline, accent_hex, dx)
 

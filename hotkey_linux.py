@@ -9,7 +9,15 @@ class HotkeyListener:
         self.on_trigger_callback = on_trigger_callback
         self.running = False
         self.last_tap_time = 0
-        self.double_tap_threshold = 0.4  # seconds
+        # Widened from 0.4: a double tap that lands slower than this is read as
+        # two separate first-taps and nothing happens, which is most of what
+        # 'sometimes it works' felt like.
+        self.double_tap_threshold = 0.6  # seconds
+        # Guards the tap counters. One listener thread runs per input device,
+        # and they all share this state -- two devices reporting the same key,
+        # or a virtual keyboard echoing it, could otherwise interleave and
+        # leave the count somewhere neither tap expected.
+        self._tap_lock = __import__('threading').Lock()
         self.tap_count = 0
         
         # For multi-key combos
@@ -46,18 +54,24 @@ class HotkeyListener:
                         if len(set(self.keycode)) == 1:
                             if event.value == 1 and event.code == self.keycode[0]:
                                 current_time = time.time()
-                                time_diff = current_time - self.last_tap_time
-                                if time_diff < 0.05:
-                                    pass
-                                elif time_diff < self.double_tap_threshold:
-                                    self.tap_count += 1
-                                    self.last_tap_time = current_time
-                                    if self.tap_count >= len(self.keycode):
-                                        self.tap_count = 0
-                                        self.on_trigger_callback()
-                                else:
-                                    self.tap_count = 1
-                                    self.last_tap_time = current_time
+                                fire = False
+                                with self._tap_lock:
+                                    time_diff = current_time - self.last_tap_time
+                                    # A tighter dead zone: 50ms was wide enough
+                                    # to swallow a genuinely quick second tap.
+                                    if time_diff < 0.03:
+                                        pass
+                                    elif time_diff < self.double_tap_threshold:
+                                        self.tap_count += 1
+                                        self.last_tap_time = current_time
+                                        if self.tap_count >= len(self.keycode):
+                                            self.tap_count = 0
+                                            fire = True
+                                    else:
+                                        self.tap_count = 1
+                                        self.last_tap_time = current_time
+                                if fire:
+                                    self.on_trigger_callback()
                         else:
                             # It's a simultaneous combo (e.g. Ctrl + Shift + R)
                             if event.value == 1 and all(k in self.pressed_keys for k in self.keycode):
