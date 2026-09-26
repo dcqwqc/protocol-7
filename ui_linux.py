@@ -494,20 +494,31 @@ class UIManager:
         self.app.hold()
         if not self.overlay:
             self.overlay = DictationOverlay(app, self.config, self.audio_recorder)
-            self.overlay.set_visible(True)
+            # Do not leave a transparent overlay surface mapped while idle.
+            # Even with an empty input region, some compositor/GTK combinations
+            # can keep stale pointer geometry after output/window reconfiguration.
+            # No surface at all is the only state that cannot intercept a click.
+            self.overlay.set_visible(False)
             self.preview = LivePreviewPopup(app)
 
     def show(self):
         if self.overlay:
+            self.overlay.set_visible(True)
             self.overlay.visualizer.is_processing = False
             self.overlay.visualizer.animate_to(1.0)
         if self.preview:
             self.preview.hide_preview()
 
+    def _finish_hide(self):
+        if self.overlay and self.overlay.visualizer.target == 0.0:
+            self.overlay.set_visible(False)
+        return False
+
     def hide(self):
         if self.overlay:
             self.overlay.visualizer.is_processing = False
             self.overlay.visualizer.animate_to(0.0)
+            GLib.timeout_add(SLIDE_MS + 50, self._finish_hide)
         if self.preview:
             self.preview.hide_preview()
 
