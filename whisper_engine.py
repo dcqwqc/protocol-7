@@ -40,8 +40,7 @@ class WhisperEngine:
         
         kwargs = {
             "task": task,
-            "condition_on_previous_text": False,
-            "initial_prompt": "Hello. This is a clean, perfectly punctuated transcript."
+            "condition_on_previous_text": False
         }
         
         if not auto_detect and language:

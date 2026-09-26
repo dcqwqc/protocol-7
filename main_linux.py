@@ -211,9 +211,9 @@ class Protocol7App:
                         log_debug("Discarding transcription: cancelled by hotkey")
                         return
 
-                    # Hide UI before pasting so Wayland compositor restores focus to terminal
-                    GLib.idle_add(self.ui_manager.hide)
-                    time.sleep(0.4) # Wait 400ms to ensure the user has physically released the Ctrl key
+                    # Wait 400ms to ensure the user has physically released the keys before pasting.
+                    # The UI stays in the 'processing' state during this time so the user knows it's not done yet.
+                    time.sleep(0.4)
                     
                     if clean_text.strip():
                         from config import add_history
